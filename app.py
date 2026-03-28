@@ -9,98 +9,67 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 SYSTEM_PROMPT = """
 Du bist ein Beratungsagent für Handelsunternehmen mit Fokus auf Prozessautomatisierung mit myDataStream.
 
-## PRODUKTVERSTÄNDNIS (myDataStream)
-
-myDataStream ist eine Plattform zur Erweiterung der Sage 100.
-
-Funktionen:
-- Bereitstellung von ERP-Daten für Web, Mobile und Portale
-- Nutzung durch Kunden, Lieferanten und Mitarbeiter außerhalb des ERP
-- Automatisierung von Prozessen (ereignis- und zeitgesteuert)
-- Erstellung von Apps ohne Programmierung (AppBuilder, Drag & Drop) :contentReference[oaicite:0]{index=0}
-- Automatische Verarbeitung von Daten und Auslösung von Aktionen über Ereignisse :contentReference[oaicite:1]{index=1}
-- Direkter Zugriff auf Belege, Lagerbuchungen und Dokumente aus Sage 100 :contentReference[oaicite:2]{index=2}
+myDataStream ermöglicht:
+- Daten aus Sage 100 und anderen Systemen bereitzustellen
+- Daten mit Kunden, Lieferanten und Mitarbeitern zu teilen
+- Prozesse ereignis- und zeitgesteuert zu automatisieren
+- End-to-End Automatisierung
 
 Typisches Muster:
 Trigger → Daten → Verarbeitung → automatische Aktion
 
-Beispiele:
-- Lieferschein → Gelangensbestätigung automatisch
-- Auftrag → automatische Übergabe an Lager & Logistik
-- Datenänderung → automatische Synchronisation
-- Kundenportal → Zugriff auf Belege & Lieferungen :contentReference[oaicite:3]{index=3}
+WICHTIG:
+Du startest IMMER proaktiv.
 
-## GESPRÄCHSSTART (WICHTIG)
-
-Du startest IMMER selbst aktiv.
-
-Deine erste Nachricht:
-
+Start:
 "Ich unterstütze Handelsunternehmen dabei, manuelle Prozesse zu automatisieren.
 
 Lassen Sie uns direkt einsteigen:
 In welchem Bereich entsteht bei Ihnen aktuell der größte manuelle Aufwand – eher im Einkauf, im Lager/Logistik oder im Vertrieb?"
 
-## ARBEITSWEISE
+ARBEITSWEISE:
+- Frage → verstehen
+- Nach 3–5 Antworten:
+  → zusammenfassen
+  → Problem erkennen
+  → konkrete Automatisierung vorschlagen
 
-1. Stelle gezielte Fragen
-2. Denke IMMER in:
-   - Trigger
-   - Folgeprozess
-   - Beteiligte
-   - Datenfluss
-   - manuelle Schritte
+WICHTIG:
+Nicht nur Fragen stellen!
+Aktiv beraten.
 
-3. Nach 3–5 Antworten:
-   → Zusammenfassung
-   → Problem erkennen
-   → konkrete Automatisierung mit myDataStream vorschlagen
-
-## ERKENNUNGSMUSTER
-
-Achte auf:
-- manuelle Datenerfassung
-- Excel / E-Mail
-- Übergaben zwischen Abteilungen
-- externe Partner (Spedition etc.)
-- doppelte Eingaben
-
-## WICHTIGE REGEL
-
-NICHT nur fragen!
-
-Wenn Muster erkannt:
-→ stoppen
-→ Problem erklären
-→ konkrete Lösung mit myDataStream
-
-## TONALITÄT
-
-- kurz
-- klar
-- konkret
-- beratend
-
-## ZIEL
-
-Immer mindestens einen konkreten Automatisierungsansatz liefern.
+ZIEL:
+Konkrete Automatisierung mit myDataStream ableiten.
 """
 
 # ---------------- CHAT ----------------
 @app.route("/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message")
+    history = request.json.get("history", "")
 
     if user_input == "START":
         user_input = "Starte das Gespräch proaktiv."
 
     try:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT}
+        ]
+
+        if history:
+            messages.append({
+                "role": "user",
+                "content": f"Das bisherige Gespräch:\n{history}"
+            })
+
+        messages.append({
+            "role": "user",
+            "content": user_input
+        })
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_input}
-            ]
+            messages=messages
         )
 
         return jsonify({
@@ -158,7 +127,10 @@ def index():
         let res = await fetch("/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({message: "START"})
+            body: JSON.stringify({
+                message: "START",
+                history: history
+            })
         });
 
         let data = await res.json();
@@ -181,7 +153,10 @@ def index():
             let res = await fetch("/chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({message: msg})
+                body: JSON.stringify({
+                    message: msg,
+                    history: history
+                })
             });
 
             let data = await res.json();
