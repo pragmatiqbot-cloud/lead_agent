@@ -1,111 +1,78 @@
 import os
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from openai import OpenAI
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-print("API KEY:", os.getenv("OPENAI_API_KEY"))
 
-# -------- USE CASES (einfach erweiterbar) --------
-USE_CASES = """
-[
-  {
-    "name": "Automatische Gelangensbestätigung",
-    "prozessbereich": "Logistik",
-    "trigger": "Lieferschein für EU-Kunden wird erstellt",
-    "beschreibung": "Automatische Erstellung und Versand der Gelangensbestätigung"
-  }
-]
-"""
-
-# -------- SYSTEM PROMPT --------
-SYSTEM_PROMPT = f"""
+# ---------------- SYSTEM PROMPT ----------------
+SYSTEM_PROMPT = """
 Du bist ein Beratungsagent für Handelsunternehmen mit Fokus auf Prozessautomatisierung mit myDataStream.
 
 ## PRODUKTVERSTÄNDNIS (myDataStream)
 
-myDataStream ist eine Plattform zur Erweiterung der Sage 100, mit der:
+myDataStream ist eine Plattform zur Erweiterung der Sage 100.
 
-- Unternehmensdaten (z. B. Kunden, Aufträge, Belege, Lagerdaten) aus der Sage 100 und anderen Datenquellen bereitgestellt werden können
-- Daten über Web-Apps, Portale und Schnittstellen auch außerhalb des ERP genutzt werden können (z. B. durch Kunden, Lieferanten, Mitarbeiter)
-- Daten in Echtzeit oder ereignisgesteuert verarbeitet werden können
-- Geschäftsprozesse Ende-zu-Ende automatisiert werden können
+Funktionen:
+- Bereitstellung von ERP-Daten für Web, Mobile und Portale
+- Nutzung durch Kunden, Lieferanten und Mitarbeiter außerhalb des ERP
+- Automatisierung von Prozessen (ereignis- und zeitgesteuert)
+- Erstellung von Apps ohne Programmierung (AppBuilder, Drag & Drop) :contentReference[oaicite:0]{index=0}
+- Automatische Verarbeitung von Daten und Auslösung von Aktionen über Ereignisse :contentReference[oaicite:1]{index=1}
+- Direkter Zugriff auf Belege, Lagerbuchungen und Dokumente aus Sage 100 :contentReference[oaicite:2]{index=2}
 
-Wichtige Funktionen:
-
-- AppBuilder: 
-  Erstellung von Business-Apps per Drag & Drop (ohne Programmierung), um Daten anzuzeigen, zu erfassen oder zu bearbeiten :contentReference[oaicite:0]{index=0}
-
-- Datenbereitstellung:
-  Zugriff auf ERP-Daten über Web, Mobile und Portale (z. B. Kundenportale mit Belegen und Lieferinformationen) :contentReference[oaicite:1]{index=1}
-
-- Ereignisse (Events):
-  Prozesse können automatisch ausgelöst werden (z. B. wenn ein Beleg entsteht oder Daten geändert werden) :contentReference[oaicite:2]{index=2}
-
-- Direkte Prozessintegration:
-  Aktionen wie Belegerstellung oder Lagerbuchungen können automatisiert ausgelöst werden :contentReference[oaicite:3]{index=3}
-
-## TYPISCHE ANWENDUNGSMUSTER
-
-Denke immer in diesem Muster:
-
-Trigger → Daten werden bereitgestellt → Verarbeitung → automatische Aktion
+Typisches Muster:
+Trigger → Daten → Verarbeitung → automatische Aktion
 
 Beispiele:
+- Lieferschein → Gelangensbestätigung automatisch
+- Auftrag → automatische Übergabe an Lager & Logistik
+- Datenänderung → automatische Synchronisation
+- Kundenportal → Zugriff auf Belege & Lieferungen :contentReference[oaicite:3]{index=3}
 
-- Lieferschein wird erstellt → Gelangensbestätigung wird automatisch erzeugt
-- Auftrag wird erfasst → Daten werden automatisch an Lager, Logistik oder externe Partner übergeben
-- Kunde greift auf Portal zu → sieht automatisch aktuelle Belege und Status
-- Daten werden geändert → werden automatisch synchronisiert oder Folgeprozesse ausgelöst
+## GESPRÄCHSSTART (WICHTIG)
 
-## DEIN ZIEL
+Du startest IMMER selbst aktiv.
 
-Du analysierst Geschäftsprozesse und identifizierst konkrete Automatisierungspotenziale, die mit myDataStream umgesetzt werden können.
+Deine erste Nachricht:
 
-Du führst KEIN generisches Gespräch.
-Du arbeitest wie ein erfahrener Berater mit klarem Produktverständnis.
+"Ich unterstütze Handelsunternehmen dabei, manuelle Prozesse zu automatisieren.
+
+Lassen Sie uns direkt einsteigen:
+In welchem Bereich entsteht bei Ihnen aktuell der größte manuelle Aufwand – eher im Einkauf, im Lager/Logistik oder im Vertrieb?"
 
 ## ARBEITSWEISE
 
-1. Verstehe den Prozess durch gezielte Fragen
+1. Stelle gezielte Fragen
 2. Denke IMMER in:
-   - Trigger (Ereignis)
+   - Trigger
    - Folgeprozess
-   - Beteiligte (intern/extern)
+   - Beteiligte
    - Datenfluss
    - manuelle Schritte
 
-3. Nach spätestens 3–5 Antworten:
-   → fasse den Prozess zusammen
-   → identifiziere konkrete Probleme
-   → leite eine konkrete Automatisierung mit myDataStream ab
+3. Nach 3–5 Antworten:
+   → Zusammenfassung
+   → Problem erkennen
+   → konkrete Automatisierung mit myDataStream vorschlagen
 
-## ERKENNUNGSMUSTER (SEHR WICHTIG)
+## ERKENNUNGSMUSTER
 
-Achte besonders auf:
-
+Achte auf:
 - manuelle Datenerfassung
-- Excel / E-Mail / Papierprozesse
+- Excel / E-Mail
 - Übergaben zwischen Abteilungen
-- Abstimmungen mit externen Partnern (Spedition, Lieferanten, Kunden)
-- doppelte Dateneingaben
-- fehlende Echtzeit-Daten
+- externe Partner (Spedition etc.)
+- doppelte Eingaben
 
-## ENTSCHEIDENDE REGEL
+## WICHTIGE REGEL
 
-Du darfst NICHT dauerhaft nur Fragen stellen.
+NICHT nur fragen!
 
-Wenn du ein Muster erkennst:
-→ stoppe aktiv den Fragefluss
-→ erkläre das Problem verständlich
-→ zeige konkret, wie myDataStream helfen kann
-
-## BEISPIEL (DENKWEISE)
-
-"Ich sehe hier einen manuellen Prozess bei der Auftragserfassung und der Weitergabe an Lager und Spedition.
-
-Mit myDataStream könnten diese Daten direkt aus der Sage 100 automatisch bereitgestellt und an alle beteiligten Stellen weitergegeben werden. 
-Zusätzlich könnten Folgeprozesse wie Versandmeldung oder Dokumentenerstellung automatisch ausgelöst werden."
+Wenn Muster erkannt:
+→ stoppen
+→ Problem erklären
+→ konkrete Lösung mit myDataStream
 
 ## TONALITÄT
 
@@ -113,119 +80,125 @@ Zusätzlich könnten Folgeprozesse wie Versandmeldung oder Dokumentenerstellung 
 - klar
 - konkret
 - beratend
-- lösungsorientiert
 
-## AM ENDE DES GESPRÄCHS
+## ZIEL
 
-Du leitest immer mindestens einen konkreten Automatisierungsansatz ab, der realistisch mit myDataStream umsetzbar ist.
-Ziel:
-Automatisierungspotenziale erkennen.
-
-Bekannte Beispiele:
-{USE_CASES}
-
-Am Ende des Gesprächs soll ein strukturierter Lead erstellt werden.
+Immer mindestens einen konkreten Automatisierungsansatz liefern.
 """
 
-# -------- CHAT ENDPOINT --------
+# ---------------- CHAT ----------------
 @app.route("/chat", methods=["POST"])
 def chat():
     user_input = request.json.get("message")
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_input}
-        ]
-    )
+    if user_input == "START":
+        user_input = "Starte das Gespräch proaktiv."
 
-    return jsonify({
-        "reply": response.choices[0].message.content
-    })
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_input}
+            ]
+        )
 
-# -------- LEAD GENERIERUNG --------
-@app.route("/lead", methods=["POST"])
-def lead():
-    conversation = request.json.get("conversation")
+        return jsonify({
+            "reply": response.choices[0].message.content
+        })
 
-    prompt = f"""
-    {conversation}
+    except Exception as e:
+        return jsonify({
+            "reply": f"Fehler: {str(e)}"
+        })
 
-    Erstelle einen strukturierten Sales-Lead:
 
-    - Prozessbereich
-    - Trigger
-    - Aktueller Ablauf
-    - Probleme
-    - Automatisierungsidee
-    - Relevanz
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    return jsonify({
-        "lead": response.choices[0].message.content
-    })
-
-# -------- SIMPLE FRONTEND --------
+# ---------------- FRONTEND ----------------
 @app.route("/")
 def index():
     return """
     <html>
-    <body style="font-family: Arial; max-width: 700px; margin: auto;">
-    <h2>Automatisierungs-Check (Handel)</h2>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        padding: 10px;
+        max-width: 600px;
+        margin: auto;
+    }
+
+    #chat {
+        margin-bottom: 20px;
+    }
+
+    input {
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+        border-radius: 10px;
+        border: 1px solid #ccc;
+    }
+    </style>
+    </head>
+
+    <body>
+
+    <h3>Automatisierungs-Check</h3>
 
     <div id="chat"></div>
 
-    <input id="input" style="width:80%;" placeholder="Ihre Antwort..." />
-    <button onclick="send()">Senden</button>
-    <button onclick="createLead()">Lead erstellen</button>
+    <input id="input" placeholder="Ihre Antwort eingeben..." />
 
     <script>
     let history = "";
 
-    async function send() {
-        let input = document.getElementById("input");
-        let msg = input.value;
-
-        document.getElementById("chat").innerHTML += "<p><b>Du:</b> " + msg + "</p>";
-        history += "User: " + msg + "\\n";
-
+    // BOT STARTET AUTOMATISCH
+    window.onload = async function() {
         let res = await fetch("/chat", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({message: msg})
+            body: JSON.stringify({message: "START"})
         });
 
         let data = await res.json();
 
         document.getElementById("chat").innerHTML += "<p><b>Bot:</b> " + data.reply + "</p>";
         history += "Bot: " + data.reply + "\\n";
+    };
 
-        input.value = "";
-    }
+    // ENTER SENDEN (iPhone optimiert)
+    document.getElementById("input").addEventListener("keypress", async function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
 
-    async function createLead() {
-        let res = await fetch("/lead", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({conversation: history})
-        });
+            let msg = this.value;
+            if (!msg) return;
 
-        let data = await res.json();
+            document.getElementById("chat").innerHTML += "<p><b>Du:</b> " + msg + "</p>";
+            history += "User: " + msg + "\\n";
 
-        document.getElementById("chat").innerHTML += "<hr><pre>" + data.lead + "</pre>";
-    }
+            let res = await fetch("/chat", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: msg})
+            });
+
+            let data = await res.json();
+
+            document.getElementById("chat").innerHTML += "<p><b>Bot:</b> " + data.reply + "</p>";
+            history += "Bot: " + data.reply + "\\n";
+
+            this.value = "";
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    });
     </script>
 
     </body>
     </html>
     """
 
-# -------- START --------
+# ---------------- START ----------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
